@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# uv environment and local caches
+.venv/
+.uv-cache/
+.uv-python/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Trained model weights and experiment outputs
+*.pt
+*.pth
+*.onnx
+ALGORITHMS/data/raw/*
+ALGORITHMS/data/reference/*
+ALGORITHMS/data/masks/*
+ALGORITHMS/data/detections/*
+ALGORITHMS/data/results/*
+
+# Local databases
+DATABASE/*.db
+DATABASE/*.sqlite
+DATABASE/*.sqlite3
+
+# Frontend dependencies and build output
+FRONTEND/node_modules/
+FRONTEND/dist/
+FRONTEND/dist-ssr/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
