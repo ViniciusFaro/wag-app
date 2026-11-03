@@ -1,16 +1,24 @@
-# React + Vite
+# MicroFlow frontend · LabMEMS / UFRJ
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React interface for uploading micromodel images and exploring their analysis.
+See the [project README](../README.md) for the backend and full setup.
 
-Currently, two official plugins are available:
+```powershell
+npm install
+npm run dev
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The backend must run at `127.0.0.1:8000`. Vite proxies `/api` there.
 
-## React Compiler
+## Pages
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `/`: file selection, preview and upload.
+- `/analysis/sample`: existing real sample results.
+- `/analysis/<id>`: live progress and results for a new upload.
 
-## Expanding the ESLint configuration
+The result page includes original/segmentation/detection/overlay tabs, phase
+charts, searchable and sortable dead-end table/grid views, expandable crops,
+and CSV and segmentation-mask downloads. Fractions exclude wall pixels.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Build with `npm run build`. The source logos are in `public/brand/`; their
+backgrounds and colors are adapted using CSS filters and blending.
