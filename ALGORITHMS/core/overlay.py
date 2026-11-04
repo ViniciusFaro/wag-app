@@ -3,6 +3,8 @@
 import cv2
 import numpy as np
 
+from ALGORITHMS.indicators.oleo_residual_recuperacao import calculate_residual_oil
+
 CLASS_NAMES = ("Water", "Oil", "Gas")
 
 
@@ -25,6 +27,9 @@ def composition(pixels):
         "dominant_class": CLASS_NAMES[int(fluid_counts.argmax())]
         if fluid_total
         else None,
+        "residual_oil": calculate_residual_oil(
+            dict(zip(CLASS_NAMES, fluid_counts.tolist()))
+        ),
     }
 
 

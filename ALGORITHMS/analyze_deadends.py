@@ -14,6 +14,7 @@ import numpy as np
 
 from ALGORITHMS.core.deadend_crops import export_deadend_crops
 from ALGORITHMS.core.overlay import CLASS_NAMES, analyze_regions
+from ALGORITHMS.indicators.oleo_residual_recuperacao import write_residual_oil_exports
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,6 +49,7 @@ def main():
     report["source_report"] = str((args.input / "report.json").resolve())
     report["normalization_assumption"] = source.get("normalization_assumption")
     args.output.mkdir(parents=True, exist_ok=True)
+    write_residual_oil_exports(report, args.output)
     (args.output / "composition.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"
     )

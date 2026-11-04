@@ -12,6 +12,7 @@ import torch
 from .deadend_crops import export_deadend_crops
 from .inference import COLORS, ROOT, detect, load_yolo, segment
 from .overlay import CLASS_NAMES, analyze_regions
+from ALGORITHMS.indicators.oleo_residual_recuperacao import write_residual_oil_exports
 
 
 def run_analysis(image_path, output_dir, progress=lambda stage: None):
@@ -60,6 +61,7 @@ def run_analysis(image_path, output_dir, progress=lambda stage: None):
     save("overlay.png", overlay)
     progress("composition")
     analysis, aligned, union = analyze_regions(mask, detections)
+    write_residual_oil_exports(analysis, output_dir)
     save("deadend_box_union.png", union.astype(np.uint8) * 255, colored=False)
     export_deadend_crops(rgb, aligned, analysis, output_dir / "deadends")
     analysis["normalization_assumption"] = "RGB float32 /255; confirm against training"

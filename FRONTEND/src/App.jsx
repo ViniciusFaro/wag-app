@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 import "./App.css";
 import { decimal, localizeApiMessage, number, percent } from "./locale.js";
+import ResidualOilSection, { ResidualOilMetrics } from "./ResidualOil.jsx";
 
 const FLUIDS = [
   { key: "Oil", label: "Óleo", color: "#e3676d" },
@@ -179,8 +180,7 @@ function Shell() {
           </p>
           <span>
             Segmentação de fases
-            <br />
-            e detecção de regiões.
+            <br />e detecção de regiões.
           </span>
         </div>
         <div className="sidebar-footer">
@@ -279,7 +279,9 @@ function UploadPage({ online }) {
     setError("");
     if (!file) return;
     if (!/\.(png|jpe?g|tiff?|webp)$/i.test(file.name)) {
-      setError("Formato não suportado. Formatos aceitos: PNG, JPG, TIFF e WebP.");
+      setError(
+        "Formato não suportado. Formatos aceitos: PNG, JPG, TIFF e WebP.",
+      );
       return;
     }
     if (file.size > 25 * 1024 * 1024) {
@@ -321,7 +323,8 @@ function UploadPage({ online }) {
           <h1>Análise de micromodelo</h1>
           <p>
             Segmentação de fases, detecção de Dead ends
-            <br className="desktop-break" /> e quantificação da composição dos fluidos.
+            <br className="desktop-break" /> e quantificação da composição dos
+            fluidos.
           </p>
         </div>
         <div className="intro-coordinate">
@@ -380,9 +383,7 @@ function UploadPage({ online }) {
                   <span>{selected.file.name}</span>
                   <span>{decimal(selected.file.size / 1024 / 1024, 1)} MB</span>
                 </div>
-                <span className="change-image">
-                  Substituir imagem
-                </span>
+                <span className="change-image">Substituir imagem</span>
               </>
             ) : (
               <>
@@ -391,7 +392,8 @@ function UploadPage({ online }) {
                 </span>
                 <h3>Imagem do micromodelo</h3>
                 <p>
-                  <span className="browse-text">Selecionar arquivo</span> ou arrastar a imagem para esta área.
+                  <span className="browse-text">Selecionar arquivo</span> ou
+                  arrastar a imagem para esta área.
                 </p>
                 <span className="format-list">
                   PNG, JPG, TIFF ou WebP <span>·</span> Até 25 MB
@@ -402,7 +404,8 @@ function UploadPage({ online }) {
           <div className="upload-tip">
             <Icon name="info" size={16} />
             <span>
-              Entrada: imagem original do micromodelo, sem anotações ou sobreposições.
+              Entrada: imagem original do micromodelo, sem anotações ou
+              sobreposições.
             </span>
           </div>
           {error && (
@@ -436,7 +439,8 @@ function UploadPage({ online }) {
           </div>
           {online === false && (
             <p className="offline-help">
-              Servidor Python indisponível. Instruções de inicialização no README do projeto.
+              Servidor Python indisponível. Instruções de inicialização no
+              README do projeto.
             </p>
           )}
         </section>
@@ -444,7 +448,8 @@ function UploadPage({ online }) {
           <span className="step-label">ETAPAS DO PROCESSAMENTO</span>
           <h2>Fluxo de análise</h2>
           <p className="pipeline-description">
-            Segmentação semântica, detecção de regiões e análise da composição dos fluidos.
+            Segmentação semântica, detecção de regiões e análise da composição
+            dos fluidos.
           </p>
           <div className="pipeline-steps">
             {[
@@ -465,6 +470,12 @@ function UploadPage({ online }) {
                 icon: "chart",
                 title: "Composição dos fluidos",
                 desc: "Cálculo das frações de água, óleo e gás por região.",
+              },
+              {
+                n: "04",
+                icon: "drop",
+                title: "Óleo residual em Dead ends",
+                desc: "Estimativa do óleo residual e removido pela água.",
               },
             ].map((item) => (
               <div className="pipeline-step" key={item.n}>
@@ -501,7 +512,8 @@ function UploadPage({ online }) {
           <span className="step-label">ANÁLISE DE EXEMPLO</span>
           <h3>Resultados de uma imagem de exemplo</h3>
           <p>
-            Resultados de segmentação, detecção de Dead ends e composição dos fluidos.
+            Resultados de segmentação, detecção de Dead ends e composição dos
+            fluidos.
           </p>
         </div>
         <Link className="secondary-button" to="/analysis/sample">
@@ -512,7 +524,8 @@ function UploadPage({ online }) {
       <div className="upload-bottom">
         <span>
           <Icon name="check" size={14} />
-          Processamento local com armazenamento dos arquivos no diretório do projeto.
+          Processamento local com armazenamento dos arquivos no diretório do
+          projeto.
         </span>
         <span>
           DCA UNet <span>+</span> YOLOv5
@@ -633,7 +646,8 @@ function Processing({ analysis }) {
           ))}
         </div>
         <p className="processing-note">
-          Processamento local. O tempo de execução depende das dimensões da imagem e dos recursos computacionais.
+          Processamento local. O tempo de execução depende das dimensões da
+          imagem e dos recursos computacionais.
         </p>
       </div>
     </div>
@@ -834,6 +848,10 @@ function Results({ analysis }) {
         </section>
         <CompositionChart composition={analysis.composition} />
       </div>
+      <ResidualOilSection
+        composition={analysis.composition}
+        assets={analysis.assets}
+      />
       <DeadendExplorer items={analysis.deadends} />
       <p className="analysis-method">
         <Icon name="info" size={15} />
@@ -1029,7 +1047,7 @@ function DeadendExplorer({ items }) {
     <section className="panel deadends-panel">
       <div className="deadends-heading">
         <div>
-          <span className="step-label">03 / EXPLORADOR DE REGIÕES</span>
+          <span className="step-label">04 / EXPLORADOR DE REGIÕES</span>
           <h2>
             Análise por região
             <span className="count-badge">{items.length} Dead ends</span>
@@ -1108,7 +1126,10 @@ function DeadendExplorer({ items }) {
         <div className="no-regions">
           <Icon name="search" size={24} />
           <h3>Nenhuma região encontrada</h3>
-          <p>Nenhuma região corresponde aos critérios de busca ou ao filtro de composição.</p>
+          <p>
+            Nenhuma região corresponde aos critérios de busca ou ao filtro de
+            composição.
+          </p>
         </div>
       ) : mode === "table" ? (
         <div className="table-scroll">
@@ -1385,6 +1406,7 @@ function DeadendModal({ item, onClose, onPrevious, onNext }) {
         </div>
         <FluidBar fractions={item.class_fractions} />
       </div>
+      <ResidualOilMetrics data={item.residual_oil} compact />
       <div className="detail-coordinates">
         <span>
           Coordenadas da caixa <code>{item.pixel_bounds_xyxy.join(", ")}</code>

@@ -8,13 +8,19 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
+
+from ALGORITHMS.indicators.oleo_residual_recuperacao import (
+    residual_oil_csv,
+    residual_oil_report,
+    with_residual_oil,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / "ALGORITHMS/data/results"
@@ -43,7 +49,7 @@ def completed_payload(job_id, folder, inference_folder, metadata):
     is_sample = job_id == "sample"
     items = [
         {
-            **item,
+            **with_residual_oil(item),
             "assets": {
                 key: asset_url(folder / "deadends" / path)
                 for key, path in item["assets"].items()
@@ -63,8 +69,8 @@ def completed_payload(job_id, folder, inference_folder, metadata):
         "deadend_count": analysis["deadend_count"],
         "coverage_percent": analysis["box_union_image_percent"],
         "composition": {
-            "full_image": analysis["full_image"],
-            "deadends": analysis["inside_deadend_boxes"],
+            "full_image": with_residual_oil(analysis["full_image"]),
+            "deadends": with_residual_oil(analysis["inside_deadend_boxes"]),
         },
         "assets": {
             "original": "/api/sample-image"
@@ -79,6 +85,8 @@ def completed_payload(job_id, folder, inference_folder, metadata):
             "mask": asset_url(inference_folder / "segmentation_ids.png"),
             "report": asset_url(folder / "composition.json"),
             "csv": asset_url(folder / "per_deadend.csv"),
+            "residual_report": f"/api/analyses/{job_id}/residual-oil?format=json",
+            "residual_csv": f"/api/analyses/{job_id}/residual-oil?format=csv",
         },
         "deadends": items,
     }
@@ -190,6 +198,33 @@ async def upload(image: Annotated[UploadFile, File()]):
     update_job(job_id)
     executor.submit(process_job, job_id, path)
     return metadata
+
+
+@app.get("/api/analyses/{job_id}/residual-oil")
+def export_residual_oil(job_id: str, format: Literal["json", "csv"] = "json"):
+    """Calculate from saved counts, including runs created before this indicator."""
+    result = sample() if job_id == "sample" else job(job_id)
+    if result["status"] != "completed":
+        raise HTTPException(
+            409, "A análise precisa estar concluída para exportar os indicadores."
+        )
+    report = residual_oil_report(
+        result["composition"]["full_image"],
+        result["composition"]["deadends"],
+        result["deadends"],
+    )
+    content = (
+        residual_oil_csv(report)
+        if format == "csv"
+        else json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False)
+    )
+    return Response(
+        content=content,
+        media_type="text/csv" if format == "csv" else "application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="oleo_residual_{job_id}.{format}"'
+        },
+    )
 
 
 @app.get("/api/analyses/{job_id}")

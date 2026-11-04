@@ -71,6 +71,34 @@ processing stays local; optional web fonts are requested from Google Fonts,
 with system-font fallbacks. This development server has no authentication;
 keep it bound to loopback for the local research workflow.
 
+## Óleo residual em Dead ends
+
+A seção **Óleo residual em Dead ends** usa a hipótese de que toda a área
+fluida estava inicialmente preenchida por óleo. A parede é excluída:
+
+- Óleo inicial equivalente: `água + óleo + gás` (100% da referência).
+- Residual: `(óleo + gás) / óleo inicial × 100`.
+- Óleo removido equivalente: `água / óleo inicial × 100`.
+
+As áreas são contagens de pixels, sem conversão para volume. Os percentuais
+residual e removido somam 100% quando há pixels de fluido; com área fluida
+zero, os percentuais são indefinidos. O gás é incluído na fração residual.
+São estimativas por área de uma única imagem, sem comparação temporal.
+
+O painel alterna entre imagem completa e união das caixas de Dead ends.
+Pixels sobrepostos são contados uma única vez no agregado. Os detalhes de
+cada região também exibem os indicadores. As análises salvas anteriormente
+são calculadas a partir das contagens existentes, sem nova inferência.
+
+Os botões da seção exportam CSV e JSON com os dois agregados e todas as
+regiões. A API disponibiliza
+`/api/analyses/<id>/residual-oil?format=json` ou `format=csv` (incluindo `sample`).
+Novos processamentos e o comando `python -m ALGORITHMS.analyze_deadends`
+também gravam `residual_oil.json` e `residual_oil.csv` na pasta de resultados.
+
+Após atualizar o código, reiniciar o servidor Python e atualizar a página
+para carregar os novos campos e a seção de análise.
+
 ## Verify
 
 ```powershell
