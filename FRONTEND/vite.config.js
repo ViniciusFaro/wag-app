@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react";
+import { env } from "node:process";
 import { defineConfig } from "vite";
 
 // https://vite.dev/config/
@@ -6,6 +7,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: "127.0.0.1",
-    proxy: { "/api": "http://127.0.0.1:8000" },
+    proxy: { "/api": env.MICROFLOW_API_TARGET || "http://127.0.0.1:8000" },
   },
 });

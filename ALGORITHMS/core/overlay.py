@@ -3,34 +3,14 @@
 import cv2
 import numpy as np
 
-from ALGORITHMS.indicators.oleo_residual_recuperacao import calculate_residual_oil
-
-CLASS_NAMES = ("Water", "Oil", "Gas")
+from ALGORITHMS.indicators.fluid_composition import CLASS_NAMES, composition_from_counts
 
 
 def composition(pixels):
     counts = np.bincount(pixels.ravel(), minlength=4)
-    total = int(counts.sum())
-    fluid_counts = counts[1:4]
-    fluid_total = int(fluid_counts.sum())
-    fractions = fluid_counts / fluid_total if fluid_total else [None] * 3
-    percentages = [v * 100 if v is not None else None for v in fractions]
-    return {
-        "area_px": total,
-        "fluid_area_px": fluid_total,
-        "excluded_wall_px": int(counts[0]),
-        "class_pixels": dict(zip(CLASS_NAMES, fluid_counts.tolist())),
-        "class_fractions": dict(
-            zip(CLASS_NAMES, fractions.tolist() if fluid_total else fractions)
-        ),
-        "class_percentages": dict(zip(CLASS_NAMES, percentages)),
-        "dominant_class": CLASS_NAMES[int(fluid_counts.argmax())]
-        if fluid_total
-        else None,
-        "residual_oil": calculate_residual_oil(
-            dict(zip(CLASS_NAMES, fluid_counts.tolist()))
-        ),
-    }
+    return composition_from_counts(
+        dict(zip(CLASS_NAMES, counts[1:4].tolist())), int(counts[0])
+    )
 
 
 def analyze_regions(
@@ -98,6 +78,7 @@ def analyze_regions(
         "box_union_image_percent": inside["area_px"] / aligned.size * 100,
         "full_image": full,
         "inside_deadend_boxes": inside,
+        "outside_deadend_boxes": composition(aligned[~union]),
         "difference_percentage_points": {
             name: inside["class_percentages"][name] - full["class_percentages"][name]
             if inside["fluid_area_px"] and full["fluid_area_px"]

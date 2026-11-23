@@ -9,10 +9,11 @@ import cv2
 import numpy as np
 import torch
 
+from ALGORITHMS.indicators.oleo_residual_recuperacao import write_residual_oil_exports
+
 from .deadend_crops import export_deadend_crops
 from .inference import COLORS, ROOT, detect, load_yolo, segment
 from .overlay import CLASS_NAMES, analyze_regions
-from ALGORITHMS.indicators.oleo_residual_recuperacao import write_residual_oil_exports
 
 
 def run_analysis(image_path, output_dir, progress=lambda stage: None):
@@ -92,7 +93,21 @@ def run_analysis(image_path, output_dir, progress=lambda stage: None):
     report = {
         "image": str(image_path),
         "original_size_wh": [rgb.shape[1], rgb.shape[0]],
+        "segmentation_size_wh": [mask.shape[1], mask.shape[0]],
         "yolo_size_wh": [1792, 1344],
+        "model_weights": {
+            "UNet": "MODELS/unet/dcaunet_ema_combined_loss_weighted.pt",
+            "YOLO": "MODELS/yolo/best.pt",
+        },
+        "inference_parameters": {
+            "segmentation_normalization": "RGB float32 /255; confirm against training",
+            "segmentation_alignment": "nearest-neighbor",
+            "yolo_source": "ultralytics/yolov5:v7.0",
+            "tile_size_wh": [224, 224],
+            "tile_stride": 168,
+            "detection_confidence": 0.70,
+            "nms_iou": 0.45,
+        },
         "device": device,
         "tiles": tiles,
         "detections": detections,

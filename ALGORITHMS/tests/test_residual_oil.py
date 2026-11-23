@@ -76,6 +76,8 @@ def test_overlapping_boxes_use_union_counts_and_exports(tmp_path):
     rows = list(
         csv.DictReader(io.StringIO((tmp_path / "residual_oil.csv").read_text()))
     )
-    assert len(rows) == 4
+    assert len(rows) == 5
+    assert rows[2]["scope"] == "outside_deadends"
+    assert rows[2]["residual_percent"] == ""
     assert rows[1]["scope"] == "deadends_union"
     assert float(rows[1]["removed_percent"]) == 40

@@ -30,6 +30,9 @@ ALGORITHMS/data/results/*
 DATABASE/*.db
 DATABASE/*.sqlite
 DATABASE/*.sqlite3
+DATABASE/*.db-*
+DATABASE/*.sqlite-*
+DATABASE/*.sqlite3-*
 
 # Frontend dependencies and build output
 FRONTEND/node_modules/

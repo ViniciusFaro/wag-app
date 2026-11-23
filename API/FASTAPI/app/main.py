@@ -1,37 +1,69 @@
 """Local analysis API. Run with uvicorn API.FASTAPI.app.main:app."""
 
+import hashlib
 import json
 import logging
 import re
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
+from ALGORITHMS.indicators.fluid_composition import outside_deadend_composition
 from ALGORITHMS.indicators.oleo_residual_recuperacao import (
     residual_oil_csv,
     residual_oil_report,
     with_residual_oil,
 )
+from API.FASTAPI.app.api.v1.endpoints.endpoints import router as experiments_router
+from API.FASTAPI.app.db import session as database
+from API.FASTAPI.app.services.experiment_service import save_experiment
 
 ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / "ALGORITHMS/data/results"
 JOBS = RESULTS / "web"
 JOBS.mkdir(parents=True, exist_ok=True)
-app = FastAPI(title="LabMEMS · Análise de micromodelos", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    database.initialize_database()
+    yield
+
+
+app = FastAPI(
+    title="LabMEMS · Análise de micromodelos", version="0.2.0", lifespan=lifespan
+)
+app.include_router(experiments_router)
 app.mount("/api/files", StaticFiles(directory=RESULTS), name="analysis-files")
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="analysis")
 lock = threading.Lock()
 active_jobs = {}
 logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error(_request, exc):
+    logger.error(
+        "Database operation failed", exc_info=(type(exc), exc, exc.__traceback__)
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "O banco de dados está indisponível. Consulte o terminal do servidor."
+        },
+    )
 
 
 def read_json(path):
@@ -64,13 +96,29 @@ def completed_payload(job_id, folder, inference_folder, metadata):
         "stage": "completed",
         "image_size_wh": inference["original_size_wh"],
         "analysis_size_wh": analysis["analysis_size_wh"],
+        "segmentation_size_wh": inference.get("segmentation_size_wh"),
         "inference_seconds": inference["total_seconds"],
         "device": inference["device"],
         "deadend_count": analysis["deadend_count"],
         "coverage_percent": analysis["box_union_image_percent"],
+        "parameters": {
+            key: value
+            for key, value in analysis.items()
+            if key
+            not in {
+                "full_image",
+                "inside_deadend_boxes",
+                "outside_deadend_boxes",
+                "regions",
+            }
+        },
+        "inference": inference,
         "composition": {
             "full_image": with_residual_oil(analysis["full_image"]),
             "deadends": with_residual_oil(analysis["inside_deadend_boxes"]),
+            "outside_deadends": outside_deadend_composition(
+                analysis["full_image"], analysis["inside_deadend_boxes"]
+            ),
         },
         "assets": {
             "original": "/api/sample-image"
@@ -100,6 +148,22 @@ def update_job(job_id, **fields):
         )
 
 
+def mark_persistence(job_id, **fields):
+    """Keep polling metadata consistent after manual saves and deletions, too."""
+    if not re.fullmatch(r"[0-9a-f]{32}", job_id):
+        return
+    with lock:
+        path = JOBS / job_id / "status.json"
+        if not path.is_file():
+            return
+        metadata = read_json(path)
+        metadata.update(fields)
+        metadata.pop("persistence_error", None)
+        path.write_text(json.dumps(metadata), encoding="utf-8")
+        if job_id in active_jobs:
+            active_jobs[job_id].update(metadata)
+
+
 def process_job(job_id, image_path):
     try:
         from ALGORITHMS.core.pipeline import run_analysis
@@ -110,7 +174,7 @@ def process_job(job_id, image_path):
             JOBS / job_id / "analysis",
             lambda stage: update_job(job_id, stage=stage),
         )
-        update_job(job_id, status="completed", stage="completed")
+        completed_at = datetime.now(UTC).isoformat()
     except Exception:
         logger.exception("Analysis failed: %s", job_id)
         update_job(
@@ -119,12 +183,45 @@ def process_job(job_id, image_path):
             stage="failed",
             error="Não foi possível concluir a análise. Consulte o terminal do servidor Python para ver os detalhes.",
         )
+        return
+    try:
+        folder = JOBS / job_id / "analysis"
+        with lock:
+            metadata = dict(active_jobs[job_id])
+        result = completed_payload(
+            job_id, folder, folder, {**metadata, "completed_at": completed_at}
+        )
+        with database.SessionLocal() as db:
+            experiment, _created = save_experiment(db, result)
+            experiment_id = experiment.id
+        update_job(
+            job_id,
+            status="completed",
+            stage="completed",
+            completed_at=completed_at,
+            experiment_id=experiment_id,
+            persistence_status="saved",
+        )
+    except Exception:
+        # Inference outputs remain available; POST /api/experiments can retry the save.
+        logger.exception("Experiment persistence failed: %s", job_id)
+        update_job(
+            job_id,
+            status="completed",
+            stage="completed",
+            completed_at=completed_at,
+            persistence_status="failed",
+            persistence_error="A análise foi concluída, mas não foi salva no banco. O salvamento pode ser repetido pela API de experimentos.",
+        )
 
 
 @app.get("/api/health")
 def health():
+    with database.SessionLocal() as db:
+        db.execute(text("SELECT 1"))
     return {
         "status": "ok",
+        "database": "ok",
         "models_available": all(
             path.is_file()
             for path in [
@@ -192,6 +289,7 @@ async def upload(image: Annotated[UploadFile, File()]):
         "stage": "queued",
         "created_at": datetime.now(UTC).isoformat(),
         "is_sample": False,
+        "image_sha256": hashlib.sha256(data).hexdigest(),
     }
     with lock:
         active_jobs[job_id] = metadata
@@ -212,6 +310,7 @@ def export_residual_oil(job_id: str, format: Literal["json", "csv"] = "json"):
         result["composition"]["full_image"],
         result["composition"]["deadends"],
         result["deadends"],
+        result["composition"]["outside_deadends"],
     )
     content = (
         residual_oil_csv(report)

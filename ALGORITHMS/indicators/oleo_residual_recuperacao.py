@@ -63,8 +63,8 @@ def with_residual_oil(composition):
     }
 
 
-def residual_oil_report(full_image, deadends, regions):
-    return {
+def residual_oil_report(full_image, deadends, regions, outside_deadends=None):
+    report = {
         "method": {
             "initial_oil_equivalent": "Water + Oil + Gas",
             "residual": "Oil + Gas",
@@ -85,6 +85,11 @@ def residual_oil_report(full_image, deadends, regions):
             for region in regions
         ],
     }
+    if outside_deadends is not None:
+        report["outside_deadends"] = calculate_residual_oil(
+            outside_deadends["class_pixels"]
+        )
+    return report
 
 
 def residual_oil_csv(report):
@@ -95,6 +100,8 @@ def residual_oil_csv(report):
     writer.writeheader()
     writer.writerow({"scope": "full_image", **report["full_image"]})
     writer.writerow({"scope": "deadends_union", **report["deadends"]})
+    if "outside_deadends" in report:
+        writer.writerow({"scope": "outside_deadends", **report["outside_deadends"]})
     for region in report["regions"]:
         writer.writerow({"scope": "deadend", **region})
     return stream.getvalue()
@@ -102,7 +109,10 @@ def residual_oil_csv(report):
 
 def write_residual_oil_exports(analysis, output_dir):
     report = residual_oil_report(
-        analysis["full_image"], analysis["inside_deadend_boxes"], analysis["regions"]
+        analysis["full_image"],
+        analysis["inside_deadend_boxes"],
+        analysis["regions"],
+        analysis.get("outside_deadend_boxes"),
     )
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

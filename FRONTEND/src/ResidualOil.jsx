@@ -173,11 +173,22 @@ export default function ResidualOilSection({ composition, assets }) {
         >
           Imagem completa
         </button>
+        {composition.outside_deadends && (
+          <button
+            aria-pressed={scope === "outside_deadends"}
+            className={scope === "outside_deadends" ? "active" : ""}
+            onClick={() => setScope("outside_deadends")}
+          >
+            Fora dos Dead ends
+          </button>
+        )}
       </div>
       <p className="residual-scope-note">
         {scope === "deadends"
           ? "Cálculo sobre a união das caixas detectadas. Pixels sobrepostos são contados uma única vez."
-          : "Cálculo sobre todos os pixels de água, óleo e gás da imagem segmentada."}
+          : scope === "outside_deadends"
+            ? "Cálculo sobre os pixels externos à união das caixas de Dead ends, excluindo a parede."
+            : "Cálculo sobre todos os pixels de água, óleo e gás da imagem segmentada."}
       </p>
       {data ? (
         <ResidualOilMetrics data={data} />

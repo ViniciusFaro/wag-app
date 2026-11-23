@@ -12,6 +12,13 @@ import {
 import "./App.css";
 import { decimal, localizeApiMessage, number, percent } from "./locale.js";
 import ResidualOilSection, { ResidualOilMetrics } from "./ResidualOil.jsx";
+import Icon from "./Icon.jsx";
+import { getExperiment, request } from "./api/client.js";
+import ExperimentsPage, {
+  ExperimentInfo,
+  EntryOptions,
+  NumericalResults,
+} from "./Experiments.jsx";
 
 const FLUIDS = [
   { key: "Oil", label: "Óleo", color: "#e3676d" },
@@ -19,110 +26,9 @@ const FLUIDS = [
   { key: "Gas", label: "Gás", color: "#77c6a3" },
 ];
 
-function Icon({ name, size = 20, ...props }) {
-  const paths = {
-    plus: <path d="M12 5v14M5 12h14" />,
-    scan: (
-      <>
-        <path d="M8 3H4a1 1 0 0 0-1 1v4m13-5h4a1 1 0 0 1 1 1v4M3 16v4a1 1 0 0 0 1 1h4m8 0h4a1 1 0 0 0 1-1v-4M7 12h10" />
-        <path d="M12 7v10" />
-      </>
-    ),
-    chart: <path d="M4 4v16h17M9 16v-5m5 5V6m5 10v-8" />,
-    upload: (
-      <path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5" />
-    ),
-    arrow: <path d="M5 12h14m-6-6 6 6-6 6" />,
-    down: <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" />,
-    chevron: <path d="m9 5 7 7-7 7" />,
-    back: <path d="m15 5-7 7 7 7" />,
-    close: <path d="m6 6 12 12M6 18 18 6" />,
-    image: (
-      <>
-        <rect x="3" y="3" width="18" height="18" rx="3" />
-        <circle cx="8" cy="8" r="1.5" />
-        <path d="m3 17 6-6 4 4 3-3 5 5" />
-      </>
-    ),
-    layers: (
-      <path d="m12 3 10 6-10 6L2 9l10-6Zm-10 12 10 6 10-6M2 12l10 6 10-6" />
-    ),
-    grid: (
-      <>
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </>
-    ),
-    table: (
-      <>
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <path d="M3 9h18M3 14h18M9 9v11" />
-      </>
-    ),
-    search: (
-      <>
-        <circle cx="10" cy="10" r="6" />
-        <path d="m15 15 6 6" />
-      </>
-    ),
-    clock: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </>
-    ),
-    check: <path d="m5 12 4 4L19 6" />,
-    expand: <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />,
-    info: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 11v6m0-10v1" />
-      </>
-    ),
-    drop: <path d="M12 2C9 7 5 10 5 15a7 7 0 0 0 14 0c0-5-4-8-7-13Z" />,
-  };
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      {paths[name] || paths.scan}
-    </svg>
-  );
-}
-
-async function request(url, options) {
-  let response;
-  try {
-    response = await fetch(url, options);
-  } catch (error) {
-    if (error.name === "AbortError") throw error;
-    throw new Error(
-      "Falha na conexão com o servidor de análise. O servidor Python precisa estar em execução.",
-    );
-  }
-  const data = await response.json().catch(() => null);
-  if (!response.ok)
-    throw new Error(
-      typeof data?.detail === "string"
-        ? localizeApiMessage(data.detail)
-        : "Servidor de análise indisponível. Detalhes no terminal do servidor Python.",
-    );
-  return data;
-}
-
 function Shell() {
   const [online, setOnline] = useState(null);
+  const [connected, setConnected] = useState(null);
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -132,10 +38,16 @@ function Shell() {
     const check = () =>
       request("/api/health")
         .then((data) => {
-          if (mounted) setOnline(data.models_available);
+          if (mounted) {
+            setOnline(data.models_available);
+            setConnected(true);
+          }
         })
         .catch(() => {
-          if (mounted) setOnline(false);
+          if (mounted) {
+            setOnline(false);
+            setConnected(false);
+          }
         });
     check();
     const interval = setInterval(check, 30000);
@@ -163,10 +75,15 @@ function Shell() {
             <span>Nova análise</span>
             <span className="nav-shortcut">01</span>
           </NavLink>
+          <NavLink to="/experiments">
+            <Icon name="database" />
+            <span>Experimentos salvos</span>
+            <span className="nav-shortcut">02</span>
+          </NavLink>
           <NavLink to="/analysis/sample">
             <Icon name="chart" />
             <span>Análise de exemplo</span>
-            <span className="nav-shortcut">02</span>
+            <span className="nav-shortcut">03</span>
           </NavLink>
         </nav>
         <div className="sidebar-note">
@@ -207,12 +124,14 @@ function Shell() {
           </Link>
           <div className="connection">
             <span
-              className={`status-dot ${online === false ? "offline" : ""}`}
+              className={`status-dot ${connected === false ? "offline" : ""}`}
             />
-            {online === null
+            {connected === null
               ? "Conectando…"
-              : online
-                ? "Servidor de análise disponível"
+              : connected
+                ? online
+                  ? "Servidor de análise disponível"
+                  : "Servidor disponível · modelos indisponíveis"
                 : "Servidor de análise desconectado"}
             <span className="local-pill">LOCAL</span>
           </div>
@@ -221,6 +140,8 @@ function Shell() {
           <Routes>
             <Route path="/" element={<UploadPage online={online} />} />
             <Route path="/analysis/:id" element={<AnalysisPage />} />
+            <Route path="/experiments" element={<ExperimentsPage />} />
+            <Route path="/experiments/:id" element={<SavedExperimentPage />} />
             <Route
               path="*"
               element={
@@ -333,6 +254,7 @@ function UploadPage({ online }) {
           <span>MICROFLUÍDICA</span>
         </div>
       </section>
+      <EntryOptions />
       <div className="upload-layout">
         <section className="panel upload-panel">
           <div className="section-heading">
@@ -540,7 +462,12 @@ function AnalysisPage() {
   return <AnalysisLoader key={id} id={id} />;
 }
 
-function AnalysisLoader({ id }) {
+function SavedExperimentPage() {
+  const { id } = useParams();
+  return <AnalysisLoader key={`experiment-${id}`} id={id} saved />;
+}
+
+function AnalysisLoader({ id, saved = false }) {
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -550,13 +477,31 @@ function AnalysisLoader({ id }) {
     const controller = new AbortController();
     const poll = async () => {
       try {
-        const data = await request(`/api/analyses/${encodeURIComponent(id)}`, {
-          signal: controller.signal,
-        });
+        const options = { signal: controller.signal };
+        const data = saved
+          ? await getExperiment(id, options)
+          : await request(`/api/analyses/${encodeURIComponent(id)}`, options);
+        if (saved && !data.exports)
+          throw new Error(
+            "Reiniciar o servidor Python para carregar a consulta de experimentos e as novas rotas de exportação.",
+          );
         if (!active) return;
-        setAnalysis(data);
+        setAnalysis(
+          saved
+            ? {
+                ...data,
+                status: "completed",
+                assets: {
+                  ...data.assets,
+                  csv: data.exports.csv,
+                  residual_report: data.exports.residual_json,
+                  residual_csv: data.exports.residual_csv,
+                },
+              }
+            : data,
+        );
         setError("");
-        if (["queued", "processing"].includes(data.status))
+        if (!saved && ["queued", "processing"].includes(data.status))
           timer = setTimeout(poll, 1400);
       } catch (e) {
         if (active && e.name !== "AbortError") setError(e.message);
@@ -568,7 +513,7 @@ function AnalysisLoader({ id }) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [id, attempt]);
+  }, [id, attempt, saved]);
   if (error || analysis?.status === "failed")
     return (
       <div className="page">
@@ -576,9 +521,14 @@ function AnalysisLoader({ id }) {
           <span className="upload-icon">
             <Icon name="info" size={28} />
           </span>
-          <h1>Falha na análise</h1>
+          <h1>{saved ? "Experimento indisponível" : "Falha na análise"}</h1>
           <p role="alert">{error || localizeApiMessage(analysis.error)}</p>
           <div className="button-row">
+            {saved && (
+              <Link className="secondary-button" to="/experiments">
+                Voltar ao histórico
+              </Link>
+            )}
             <button
               className="secondary-button"
               onClick={() => setAttempt((value) => value + 1)}
@@ -593,9 +543,19 @@ function AnalysisLoader({ id }) {
         </div>
       </div>
     );
+  if (saved && !analysis)
+    return (
+      <div className="page">
+        <div className="history-empty panel" role="status">
+          <span className="spinner" />
+          <h1>Carregando experimento</h1>
+          <p>Consulta aos resultados armazenados no banco.</p>
+        </div>
+      </div>
+    );
   if (!analysis || analysis.status !== "completed")
     return <Processing analysis={analysis} />;
-  return <Results analysis={analysis} />;
+  return <Results analysis={analysis} fromDatabase={saved} />;
 }
 
 function Processing({ analysis }) {
@@ -670,7 +630,9 @@ function Metric({ icon, label, value, unit, note, accent }) {
   );
 }
 
-function Results({ analysis }) {
+function Results({ analysis, fromDatabase = false }) {
+  const location = useLocation();
+  const historyPath = `/experiments${location.state?.historySearch ? `?${location.state.historySearch}` : ""}`;
   const [view, setView] = useState("original");
   const [expanded, setExpanded] = useState(false);
   const views = [
@@ -685,6 +647,12 @@ function Results({ analysis }) {
       <div className="breadcrumb">
         <Link to="/">Área de trabalho</Link>
         <Icon name="chevron" size={13} />
+        {fromDatabase && (
+          <>
+            <Link to={historyPath}>Experimentos salvos</Link>
+            <Icon name="chevron" size={13} />
+          </>
+        )}
         <span>Resultados da análise</span>
         <Icon name="chevron" size={13} />
         <span className="file-crumb">{analysis.filename}</span>
@@ -695,7 +663,7 @@ function Results({ analysis }) {
             <span />
             SEGMENTAÇÃO, DETECÇÃO E COMPOSIÇÃO
           </span>
-          <h1>Resultados da análise</h1>
+          <h1>{fromDatabase ? analysis.name : "Resultados da análise"}</h1>
           <div className="file-meta">
             <Icon name="image" size={15} />
             <span>{analysis.filename}</span>
@@ -704,16 +672,32 @@ function Results({ analysis }) {
             <i />
             <span className="complete-label">
               <Icon name="check" size={13} />
-              Análise concluída
+              {fromDatabase ? "Experimento salvo" : "Análise concluída"}
             </span>
             {analysis.is_sample && <span className="sample-tag">EXEMPLO</span>}
           </div>
         </div>
         <div className="button-row">
+          {fromDatabase && (
+            <Link to={historyPath} className="secondary-button">
+              <Icon name="back" size={17} />
+              Histórico
+            </Link>
+          )}
           <Link to="/" className="secondary-button">
             <Icon name="plus" size={17} />
             Nova análise
           </Link>
+          {fromDatabase && (
+            <a
+              href={analysis.exports.json}
+              download
+              className="secondary-button"
+            >
+              <Icon name="down" size={17} />
+              Exportar JSON
+            </a>
+          )}
           <a href={analysis.assets.csv} download className="primary-button">
             <Icon name="down" size={17} />
             Exportar CSV
@@ -725,7 +709,11 @@ function Results({ analysis }) {
           icon="scan"
           label="Dead ends detectados"
           value={number(analysis.deadend_count)}
-          note="Confiança ≥ 70%"
+          note={
+            fromDatabase
+              ? "Regiões registradas no experimento"
+              : "Confiança ≥ 70%"
+          }
         />
         <Metric
           icon="grid"
@@ -754,6 +742,8 @@ function Results({ analysis }) {
           note={`${analysis.device.toUpperCase()} · Inferência local`}
         />
       </section>
+      {fromDatabase && <ExperimentInfo experiment={analysis} />}
+      <NumericalResults composition={analysis.composition} />
       <div className="results-visuals">
         <section className="panel viewer-panel">
           <div className="panel-heading">
@@ -808,7 +798,8 @@ function Results({ analysis }) {
             role="tabpanel"
             aria-labelledby={`tab-${view}`}
           >
-            <img
+            <AnalysisImage
+              key={analysis.assets[view]}
               src={analysis.assets[view]}
               alt={`${activeView.label} de ${analysis.filename}`}
             />
@@ -864,7 +855,8 @@ function Results({ analysis }) {
           onClose={() => setExpanded(false)}
           wide
         >
-          <img
+          <AnalysisImage
+            key={analysis.assets[view]}
             className="expanded-image"
             src={analysis.assets[view]}
             alt={activeView.label}
@@ -885,6 +877,27 @@ function Results({ analysis }) {
         </Modal>
       )}
     </div>
+  );
+}
+
+function AnalysisImage({ src, alt, compact = false, ...props }) {
+  const [failed, setFailed] = useState(!src);
+  return failed ? (
+    <span
+      className={`missing-image ${compact ? "compact" : ""}`}
+      role="img"
+      aria-label={alt || "Imagem indisponível"}
+    >
+      <Icon name="image" size={compact ? 18 : 28} />
+      {!compact && (
+        <>
+          <strong>Arquivo de imagem indisponível</strong>
+          <small>Os resultados numéricos permanecem disponíveis.</small>
+        </>
+      )}
+    </span>
+  ) : (
+    <img src={src} alt={alt} {...props} onError={() => setFailed(true)} />
   );
 }
 
@@ -1165,7 +1178,13 @@ function DeadendExplorer({ items }) {
                       className="region-link"
                       onClick={() => setSelected(item)}
                     >
-                      <img src={item.assets.original} alt="" loading="lazy" />
+                      <AnalysisImage
+                        key={item.assets.original}
+                        src={item.assets.original}
+                        alt=""
+                        loading="lazy"
+                        compact
+                      />
                       <span>
                         DE-{String(item.detection_id).padStart(3, "0")}
                         <small>Região detectada</small>
@@ -1216,12 +1235,14 @@ function DeadendExplorer({ items }) {
               onClick={() => setSelected(item)}
             >
               <div className="crop-pair">
-                <img
+                <AnalysisImage
+                  key={item.assets.original}
                   src={item.assets.original}
                   alt={`Imagem original da região ${item.detection_id} de Dead ends`}
                   loading="lazy"
                 />
-                <img
+                <AnalysisImage
+                  key={item.assets.segmentation}
                   className="pixelated"
                   src={item.assets.segmentation}
                   alt="Segmentação"
@@ -1352,7 +1373,8 @@ function DeadendModal({ item, onClose, onPrevious, onNext }) {
       </div>
       <div className="detail-images">
         <figure>
-          <img
+          <AnalysisImage
+            key={item.assets.original}
             className="pixelated"
             src={item.assets.original}
             alt="Recorte original da região de Dead ends"
@@ -1369,7 +1391,8 @@ function DeadendModal({ item, onClose, onPrevious, onNext }) {
           </figcaption>
         </figure>
         <figure>
-          <img
+          <AnalysisImage
+            key={overlay ? item.assets.overlay : item.assets.segmentation}
             className="pixelated"
             src={overlay ? item.assets.overlay : item.assets.segmentation}
             alt={

@@ -49,7 +49,8 @@ def test_legacy_saved_counts_are_enriched_without_inference(legacy_analysis):
     assert exported.json()["full_image"]["residual_percent"] == 70
     csv_response = client.get(result["assets"]["residual_csv"])
     rows = list(csv.DictReader(io.StringIO(csv_response.text)))
-    assert len(rows) == 3
+    assert len(rows) == 4
+    assert rows[2]["scope"] == "outside_deadends"
     assert rows[1]["removed_percent"] == "0.0"
     assert "attachment" in csv_response.headers["content-disposition"]
 

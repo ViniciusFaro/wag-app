@@ -2162,7 +2162,7 @@ tbody tr:hover {
 }
 @media (max-width: 640px) {
   body {
-    min-width: 360px;
+    min-width: 320px;
   }
   .sidebar {
     position: static;
